@@ -1,11 +1,1658 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Rep</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Airep — semantic case replacer</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+    <link rel="stylesheet" href="vendor/bootstrap-5.3.8-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="vendor/codemirror-5.65.20/lib/codemirror.css">
+
+    <style>
+        :root {
+            --bg: #080909;
+            --panel: #101111;
+            --panel-2: #151616;
+            --line: #303232;
+            --line-soft: #222424;
+            --text: #ededed;
+            --muted: #858989;
+            --red: #ff4050;
+            --red-soft: rgba(255, 64, 80, .20);
+            --green: #43ee8b;
+            --green-soft: rgba(67, 238, 139, .18);
+            --glow: rgba(255, 255, 255, .10);
+            --topbar-height: 62px;
+            --status-height: 29px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            min-width: 1140px;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        body::before {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            content: "";
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 18% 0%, rgba(255, 255, 255, .055), transparent 29%),
+                radial-gradient(circle at 82% 100%, rgba(255, 255, 255, .035), transparent 34%),
+                repeating-linear-gradient(0deg, rgba(255, 255, 255, .011) 0 1px, transparent 1px 4px);
+        }
+
+        button,
+        input,
+        select {
+            font: inherit;
+        }
+
+        .app-shell {
+            display: grid;
+            grid-template-rows: var(--topbar-height) minmax(0, 1fr) var(--status-height);
+            width: 100%;
+            height: 100%;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 18px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(13, 14, 14, .94);
+            box-shadow: 0 7px 30px rgba(0, 0, 0, .42), 0 1px 18px var(--glow);
+            backdrop-filter: blur(16px);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 198px;
+            user-select: none;
+        }
+
+        .brand-mark {
+            position: relative;
+            width: 28px;
+            height: 28px;
+            border: 1px solid #c9cccc;
+            border-radius: 8px;
+            box-shadow: 0 0 16px rgba(255, 255, 255, .21), inset 0 0 10px rgba(255, 255, 255, .08);
+        }
+
+        .brand-mark::before,
+        .brand-mark::after {
+            position: absolute;
+            top: 7px;
+            width: 5px;
+            height: 12px;
+            content: "";
+            border-radius: 3px;
+        }
+
+        .brand-mark::before {
+            left: 6px;
+            background: var(--red);
+            box-shadow: 0 0 11px var(--red);
+        }
+
+        .brand-mark::after {
+            right: 6px;
+            background: var(--green);
+            box-shadow: 0 0 11px var(--green);
+        }
+
+        .brand-name {
+            font-size: 18px;
+            font-weight: 720;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+
+        .brand-subtitle {
+            margin-top: 1px;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 650;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+
+        .toolbar-spacer {
+            flex: 1;
+        }
+
+        .language-control {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+
+        .toolbar-label {
+            margin: 0;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .09em;
+            text-transform: uppercase;
+        }
+
+        .language-select {
+            width: 158px;
+            height: 35px;
+            padding: 0 32px 0 11px;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            color: var(--text);
+            background-color: #151717;
+            box-shadow: none;
+            font-size: 13px;
+        }
+
+        .language-select:focus {
+            border-color: #6c7070;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, .07);
+        }
+
+        .tool-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            height: 35px;
+            padding: 0 12px;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            color: #d9dddd;
+            background: linear-gradient(180deg, #1a1c1c, #131414);
+            box-shadow: inset 0 1px rgba(255, 255, 255, .045), 0 4px 13px rgba(0, 0, 0, .18);
+            font-size: 12px;
+            font-weight: 680;
+            letter-spacing: .015em;
+            transition: border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease, background .18s ease;
+        }
+
+        .tool-button:hover {
+            border-color: #626666;
+            color: #fff;
+            background: linear-gradient(180deg, #232525, #171919);
+            box-shadow: 0 0 18px rgba(255, 255, 255, .08);
+            transform: translateY(-1px);
+        }
+
+        .tool-button:active {
+            transform: translateY(0) scale(.98);
+        }
+
+        .tool-button:disabled {
+            pointer-events: none;
+            opacity: .45;
+        }
+
+        .tool-button svg,
+        .icon-button svg {
+            width: 15px;
+            height: 15px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.8;
+        }
+
+        .tool-button.danger:hover {
+            border-color: rgba(255, 64, 80, .62);
+            color: #ff9ca5;
+            box-shadow: 0 0 18px rgba(255, 64, 80, .13);
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 340px minmax(0, 1fr);
+            min-height: 0;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        .panel {
+            position: relative;
+            min-width: 0;
+            min-height: 0;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: var(--panel);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, .28), inset 0 1px rgba(255, 255, 255, .025);
+        }
+
+        .editor-panel {
+            display: grid;
+            grid-template-rows: 45px minmax(0, 1fr) 28px;
+            transition: transform .38s cubic-bezier(.2, .8, .2, 1), border-color .25s ease, box-shadow .25s ease;
+        }
+
+        .source-panel {
+            box-shadow: -8px 0 30px rgba(255, 64, 80, .035), 0 12px 35px rgba(0, 0, 0, .30);
+        }
+
+        .result-panel {
+            box-shadow: 8px 0 30px rgba(67, 238, 139, .035), 0 12px 35px rgba(0, 0, 0, .30);
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 0 12px;
+            border-bottom: 1px solid var(--line-soft);
+            background: linear-gradient(180deg, #171919, #121313);
+        }
+
+        .panel-indicator {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+
+        .source-panel .panel-indicator {
+            background: var(--red);
+            box-shadow: 0 0 10px var(--red);
+        }
+
+        .result-panel .panel-indicator {
+            background: var(--green);
+            box-shadow: 0 0 10px var(--green);
+        }
+
+        .panel-title {
+            margin: 0;
+            color: #dfe2e2;
+            font-size: 12px;
+            font-weight: 760;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .panel-note {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .panel-header-spacer {
+            flex: 1;
+        }
+
+        .icon-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 29px;
+            height: 29px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: #999d9d;
+            background: transparent;
+            transition: color .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+        }
+
+        .icon-button:hover {
+            border-color: #3c3f3f;
+            color: #fff;
+            background: #1d1f1f;
+            box-shadow: 0 0 12px rgba(255, 255, 255, .07);
+        }
+
+        .editor-stage {
+            position: relative;
+            min-height: 0;
+            overflow: hidden;
+            background: #0d0e0e;
+        }
+
+        .editor-stage::after {
+            position: absolute;
+            top: 19px;
+            left: 49px;
+            z-index: 3;
+            max-width: 280px;
+            content: attr(data-placeholder);
+            pointer-events: none;
+            color: #555959;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            opacity: 1;
+            transition: opacity .18s ease, transform .18s ease;
+        }
+
+        .editor-stage.has-content::after {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+
+        .editor-stage.reacting {
+            animation: previewPulse .42s ease;
+        }
+
+        .editor-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            border-top: 1px solid var(--line-soft);
+            color: #686c6c;
+            background: #111212;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 10px;
+        }
+
+        .rules-panel {
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr) auto;
+        }
+
+        .rules-heading {
+            padding: 13px 13px 11px;
+            border-bottom: 1px solid var(--line-soft);
+            background: linear-gradient(180deg, #181a1a, #121313);
+        }
+
+        .rules-heading-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .rules-title {
+            margin: 0;
+            color: #e4e6e6;
+            font-size: 12px;
+            font-weight: 780;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .rules-count {
+            padding: 2px 7px;
+            border: 1px solid #343737;
+            border-radius: 99px;
+            color: #969a9a;
+            background: #101111;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 10px;
+        }
+
+        .rules-hint {
+            margin: 6px 0 0;
+            color: #777b7b;
+            font-size: 10px;
+            line-height: 1.45;
+        }
+
+        .pascal-example {
+            color: #c9cccc;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        }
+
+        .rules-list {
+            min-height: 0;
+            padding: 7px;
+            overflow-y: auto;
+            scrollbar-color: #3d4040 #121313;
+            scrollbar-width: thin;
+        }
+
+        .rule-row {
+            display: grid;
+            grid-template-columns: 22px minmax(0, 1fr) 19px minmax(0, 1fr);
+            align-items: center;
+            gap: 5px;
+            padding: 6px 5px;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            opacity: 0;
+            transform: translateY(7px);
+            animation: ruleArrive .28s ease forwards;
+            transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+        }
+
+        .rule-row:focus-within {
+            border-color: #383b3b;
+            background: rgba(255, 255, 255, .018);
+            box-shadow: 0 0 16px rgba(255, 255, 255, .035);
+        }
+
+        .rule-number {
+            color: #555959;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .rule-input {
+            width: 100%;
+            height: 31px;
+            padding: 0 8px;
+            border: 1px solid #303333;
+            border-radius: 6px;
+            outline: none;
+            color: #e4e7e7;
+            background: #0d0e0e;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 11px;
+            transition: border-color .17s ease, box-shadow .17s ease, background .17s ease;
+        }
+
+        .rule-input::placeholder {
+            color: #484b4b;
+        }
+
+        .rule-input:focus {
+            border-color: #717676;
+            background: #111212;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, .055), 0 0 12px rgba(255, 255, 255, .05);
+        }
+
+        .rule-input.from-field:not(:placeholder-shown) {
+            border-color: rgba(255, 64, 80, .38);
+        }
+
+        .rule-input.to-field:not(:placeholder-shown) {
+            border-color: rgba(67, 238, 139, .38);
+        }
+
+        .rule-input.is-invalid {
+            border-color: var(--red) !important;
+            color: #ff9ba4;
+            box-shadow: 0 0 10px rgba(255, 64, 80, .11);
+        }
+
+        .rule-arrow {
+            color: #676b6b;
+            font-size: 13px;
+            text-align: center;
+            transition: color .2s ease, transform .2s ease;
+        }
+
+        .rule-row:focus-within .rule-arrow {
+            color: #d8dbdb;
+            transform: translateX(1px);
+        }
+
+        .rules-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 34px;
+            padding: 0 12px;
+            border-top: 1px solid var(--line-soft);
+            color: #6d7171;
+            background: #111212;
+            font-size: 10px;
+        }
+
+        .live-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            margin-right: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: livePulse 2.1s ease-in-out infinite;
+        }
+
+        .statusbar {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding: 0 13px;
+            border-top: 1px solid #242626;
+            color: #6e7272;
+            background: #0d0e0e;
+            font-size: 10px;
+        }
+
+        .statusbar strong {
+            color: #b8bbbb;
+            font-weight: 650;
+        }
+
+        .status-spacer {
+            flex: 1;
+        }
+
+        .status-saved {
+            transition: color .2s ease, text-shadow .2s ease;
+        }
+
+        .status-saved.flash {
+            color: var(--green);
+            text-shadow: 0 0 8px rgba(67, 238, 139, .7);
+        }
+
+        /* CodeMirror custom dark IDE skin */
+        .CodeMirror {
+            width: 100%;
+            height: 100%;
+            color: #d5d8d8;
+            background: #0d0e0e;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 12px;
+            line-height: 1.62;
+        }
+
+        .CodeMirror-gutters {
+            border-right: 1px solid #242626;
+            background: #101111;
+        }
+
+        .CodeMirror-linenumber {
+            color: #4f5353;
+        }
+
+        .CodeMirror-cursor {
+            border-left: 1px solid #fff;
+            filter: drop-shadow(0 0 4px rgba(255, 255, 255, .65));
+        }
+
+        .CodeMirror-selected {
+            background: rgba(152, 159, 159, .22) !important;
+        }
+
+        .CodeMirror-activeline-background {
+            background: rgba(255, 255, 255, .028);
+        }
+
+        .CodeMirror-matchingbracket {
+            color: #fff !important;
+            outline: 1px solid #727777;
+            background: rgba(255, 255, 255, .08);
+        }
+
+        .cm-s-default .cm-keyword,
+        .cm-s-default .cm-tag {
+            color: #f2f4f4;
+            font-weight: 650;
+        }
+
+        .cm-s-default .cm-atom,
+        .cm-s-default .cm-number,
+        .cm-s-default .cm-attribute {
+            color: #b9bdbd;
+        }
+
+        .cm-s-default .cm-def,
+        .cm-s-default .cm-variable-2,
+        .cm-s-default .cm-variable-3,
+        .cm-s-default .cm-property {
+            color: #d9dcdc;
+        }
+
+        .cm-s-default .cm-string,
+        .cm-s-default .cm-string-2 {
+            color: #aeb3b3;
+        }
+
+        .cm-s-default .cm-comment,
+        .cm-s-default .cm-meta {
+            color: #676c6c;
+            font-style: italic;
+        }
+
+        .cm-s-default .cm-operator,
+        .cm-s-default .cm-qualifier,
+        .cm-s-default .cm-builtin {
+            color: #c7caca;
+        }
+
+        .cm-s-default .cm-error {
+            color: #fff;
+            background: rgba(255, 64, 80, .35);
+        }
+
+        .cm-replace-source {
+            border-bottom: 1px solid var(--red);
+            border-radius: 2px;
+            color: #fff !important;
+            background: var(--red-soft);
+            box-shadow: 0 0 9px rgba(255, 64, 80, .38), inset 0 -1px rgba(255, 64, 80, .35);
+            animation: sourceGlow 1.8s ease-in-out infinite alternate;
+        }
+
+        .cm-replace-target {
+            border-bottom: 1px solid var(--green);
+            border-radius: 2px;
+            color: #fff !important;
+            background: var(--green-soft);
+            box-shadow: 0 0 9px rgba(67, 238, 139, .36), inset 0 -1px rgba(67, 238, 139, .32);
+            animation: targetGlow 1.8s ease-in-out infinite alternate;
+        }
+
+        .workspace.is-swapping .source-panel {
+            z-index: 4;
+            border-color: rgba(255, 255, 255, .46);
+            box-shadow: 0 0 40px rgba(255, 255, 255, .11);
+            transform: translateX(22px) scale(.985);
+        }
+
+        .workspace.is-swapping .result-panel {
+            z-index: 4;
+            border-color: rgba(255, 255, 255, .46);
+            box-shadow: 0 0 40px rgba(255, 255, 255, .11);
+            transform: translateX(-22px) scale(.985);
+        }
+
+        /* Bootstrap components */
+        .modal-content {
+            border: 1px solid #3b3e3e;
+            border-radius: 12px;
+            color: var(--text);
+            background: #121414;
+            box-shadow: 0 22px 80px rgba(0, 0, 0, .7), 0 0 30px rgba(255, 255, 255, .055);
+        }
+
+        .modal-header,
+        .modal-footer {
+            border-color: #2c2f2f;
+        }
+
+        .modal-title {
+            font-size: 15px;
+            font-weight: 750;
+            letter-spacing: .035em;
+        }
+
+        .modal-backdrop.show {
+            opacity: .72;
+        }
+
+        .btn-close {
+            filter: invert(1) grayscale(1);
+            opacity: .6;
+        }
+
+        .case-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .case-option {
+            display: flex;
+            align-items: center;
+            min-height: 42px;
+            padding: 8px 10px;
+            border: 1px solid #2e3131;
+            border-radius: 7px;
+            background: #0d0e0e;
+            transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+        }
+
+        .case-option:hover {
+            border-color: #4a4e4e;
+            background: #151717;
+        }
+
+        .case-option:has(.form-check-input:checked) {
+            border-color: #4f5454;
+            box-shadow: inset 0 0 12px rgba(255, 255, 255, .025);
+        }
+
+        .form-check-input {
+            border-color: #555a5a;
+            background-color: #171919;
+        }
+
+        .form-check-input:checked {
+            border-color: #d9dddd;
+            background-color: #d9dddd;
+        }
+
+        .form-check-input:focus {
+            border-color: #8d9292;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, .08);
+        }
+
+        .case-label {
+            color: #cfd2d2;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 11px;
+        }
+
+        .settings-note {
+            margin: 0 0 12px;
+            color: #858989;
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .modal-action {
+            min-width: 90px;
+        }
+
+        .danger-button {
+            border-color: rgba(255, 64, 80, .5);
+            color: #fff;
+            background: #ba2836;
+        }
+
+        .danger-button:hover {
+            border-color: var(--red);
+            background: #d22f3f;
+            box-shadow: 0 0 18px rgba(255, 64, 80, .2);
+        }
+
+        .tooltip {
+            --bs-tooltip-bg: #e7eaea;
+            --bs-tooltip-color: #111212;
+            --bs-tooltip-opacity: 1;
+            --bs-tooltip-padding-x: 9px;
+            --bs-tooltip-padding-y: 6px;
+            --bs-tooltip-font-size: 11px;
+        }
+
+        .toast {
+            border: 1px solid #3e4242;
+            color: #e9ecec;
+            background: rgba(21, 23, 23, .96);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, .48), 0 0 20px rgba(255, 255, 255, .06);
+            backdrop-filter: blur(15px);
+        }
+
+        @keyframes ruleArrive {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes livePulse {
+            0%, 100% { opacity: .55; transform: scale(.85); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes previewPulse {
+            0% { box-shadow: inset 0 0 0 rgba(67, 238, 139, 0); }
+            45% { box-shadow: inset 0 0 25px rgba(67, 238, 139, .045); }
+            100% { box-shadow: inset 0 0 0 rgba(67, 238, 139, 0); }
+        }
+
+        @keyframes sourceGlow {
+            from { box-shadow: 0 0 5px rgba(255, 64, 80, .25); }
+            to { box-shadow: 0 0 12px rgba(255, 64, 80, .52); }
+        }
+
+        @keyframes targetGlow {
+            from { box-shadow: 0 0 5px rgba(67, 238, 139, .23); }
+            to { box-shadow: 0 0 12px rgba(67, 238, 139, .48); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
+            }
+        }
+    </style>
 </head>
 <body>
-    
+<main class="app-shell">
+    <header class="topbar">
+        <div class="brand" aria-label="Airep">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span>
+                <span class="brand-name">Airep</span>
+                <span class="brand-subtitle d-block">semantic replacer</span>
+            </span>
+        </div>
+
+        <div class="toolbar-spacer"></div>
+
+        <div class="language-control">
+            <label class="toolbar-label" for="languageSelect">Синтаксис</label>
+            <select id="languageSelect" class="form-select form-select-sm language-select" aria-label="Язык подсветки"></select>
+        </div>
+
+        <button id="settingsButton" class="tool-button" type="button" data-bs-toggle="modal" data-bs-target="#settingsModal" data-bs-title="Включить или отключить форматы написания" data-bs-placement="bottom">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.6v-.08A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3V9.6h.08A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.08A1.7 1.7 0 0 0 15.5 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.4.34.75.6 1 .3.28.68.42 1.1.4h.08v4h-.08A1.7 1.7 0 0 0 19.4 15Z"></path></svg>
+            Форматы
+        </button>
+
+        <button id="swapButton" class="tool-button" type="button" data-bs-toggle="tooltip" data-bs-title="Поменять местами оба текста и каждую пару правил" data-bs-placement="bottom">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7-4 4 4 4"></path><path d="M3 11h14a4 4 0 0 1 4 4v1"></path><path d="m17 3 4 4-4 4"></path><path d="M21 7H7a4 4 0 0 0-4 4"></path></svg>
+            Сменить стороны
+        </button>
+
+        <button id="clearButton" class="tool-button danger" type="button" data-bs-toggle="modal" data-bs-target="#clearModal" data-bs-title="Удалить код, правила и сохранённые настройки" data-bs-placement="bottom">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="m19 6-1 15H6L5 6"></path><path d="M10 10v7M14 10v7"></path></svg>
+            Очистить всё
+        </button>
+    </header>
+
+    <section id="workspace" class="workspace" aria-label="Рабочая область Airep">
+        <article class="panel editor-panel source-panel">
+            <header class="panel-header">
+                <span class="panel-indicator" aria-hidden="true"></span>
+                <h1 class="panel-title">Исходный код</h1>
+                <span class="panel-note">редактируется</span>
+                <span class="panel-header-spacer"></span>
+                <button class="icon-button" type="button" data-copy-editor="source" data-bs-toggle="tooltip" data-bs-title="Копировать исходный код" data-bs-placement="left" aria-label="Копировать исходный код">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
+                </button>
+            </header>
+            <div id="sourceStage" class="editor-stage" data-placeholder="Вставьте сюда код — замены начнутся автоматически.">
+                <textarea id="sourceEditor" aria-label="Исходный код"></textarea>
+            </div>
+            <footer class="editor-meta">
+                <span id="sourceCursor">Ln 1, Col 1</span>
+                <span id="sourceSize">0 символов</span>
+            </footer>
+        </article>
+
+        <aside class="panel rules-panel" aria-label="Правила замены">
+            <header class="rules-heading">
+                <div class="rules-heading-row">
+                    <h2 class="rules-title">Правила замены</h2>
+                    <span id="rulesCount" class="rules-count">0 активно</span>
+                </div>
+                <p class="rules-hint">Оба значения вводятся в PascalCase, например <span class="pascal-example">OldService → NewService</span>.</p>
+            </header>
+
+            <div id="rulesList" class="rules-list"></div>
+
+            <footer class="rules-footer">
+                <span><span class="live-dot"></span>Реактивный режим</span>
+                <span id="caseCount">12 форматов</span>
+            </footer>
+        </aside>
+
+        <article class="panel editor-panel result-panel">
+            <header class="panel-header">
+                <span class="panel-indicator" aria-hidden="true"></span>
+                <h2 class="panel-title">Результат</h2>
+                <span class="panel-note">можно править</span>
+                <span class="panel-header-spacer"></span>
+                <button class="icon-button" type="button" data-copy-editor="result" data-bs-toggle="tooltip" data-bs-title="Копировать результат" data-bs-placement="left" aria-label="Копировать результат">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
+                </button>
+            </header>
+            <div id="resultStage" class="editor-stage" data-placeholder="Здесь появится результат преобразования.">
+                <textarea id="resultEditor" aria-label="Результат замены"></textarea>
+            </div>
+            <footer class="editor-meta">
+                <span id="resultCursor">Ln 1, Col 1</span>
+                <span id="resultSize">0 символов</span>
+            </footer>
+        </article>
+    </section>
+
+    <footer class="statusbar">
+        <span>Замен: <strong id="replacementCount">0</strong></span>
+        <span>Правил: <strong id="activeRuleCount">0</strong></span>
+        <span id="manualStatus"></span>
+        <span class="status-spacer"></span>
+        <span>Однопроходный режим</span>
+        <span id="saveStatus" class="status-saved">Сохранено локально</span>
+    </footer>
+</main>
+
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="settingsModalLabel">Глобальные форматы написания</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-note">Настройки действуют сразу на все строки замены. PascalCase остаётся канонической формой ввода.</p>
+                <div class="d-flex gap-2 mb-3">
+                    <button id="enableAllCases" class="tool-button" type="button">Включить все</button>
+                    <button id="disableAllCases" class="tool-button" type="button">Отключить все</button>
+                </div>
+                <div id="caseOptions" class="case-grid"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="tool-button modal-action" data-bs-dismiss="modal">Готово</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="clearModal" tabindex="-1" aria-labelledby="clearModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="clearModalLabel">Очистить Airep?</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-note mb-0">Код, правила, выбранный язык и локальное сохранение будут удалены.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="tool-button" data-bs-dismiss="modal">Отмена</button>
+                <button id="confirmClearButton" type="button" class="tool-button danger-button">Очистить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="appToast" class="toast align-items-center" role="status" aria-live="polite" aria-atomic="true">
+        <div class="d-flex">
+            <div id="toastText" class="toast-body">Скопировано</div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
+        </div>
+    </div>
+</div>
+
+<script src="vendor/bootstrap-5.3.8-dist/js/bootstrap.bundle.min.js"></script>
+<script src="vendor/codemirror-5.65.20/lib/codemirror.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/xml/xml.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/javascript/javascript.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/css/css.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/htmlmixed/htmlmixed.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/clike/clike.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/php/php.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/python/python.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/sql/sql.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/shell/shell.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/yaml/yaml.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/meta.js"></script>
+<script src="vendor/codemirror-5.65.20/mode/markdown/markdown.js"></script>
+<script src="vendor/codemirror-5.65.20/addon/edit/closebrackets.js"></script>
+<script src="vendor/codemirror-5.65.20/addon/edit/matchbrackets.js"></script>
+<script src="vendor/codemirror-5.65.20/addon/selection/active-line.js"></script>
+
+<script>
+    (function () {
+        "use strict";
+
+        var STORAGE_KEY = "airep.state.v1";
+        var MIN_RULES = 5;
+        var PASCAL_PATTERN = /^[A-Z][A-Za-z0-9]*$/;
+        var saveTimer = null;
+        var transformTimer = null;
+        var markHandles = [];
+        var suppressEditorChanges = false;
+        var isSwapping = false;
+        var lastGeneratedOutput = "";
+
+        var CASE_STYLES = [
+            { key: "pascal", label: "PascalCase", example: "UserProfile" },
+            { key: "camel", label: "camelCase", example: "userProfile" },
+            { key: "snake", label: "snake_case", example: "user_profile" },
+            { key: "screamingSnake", label: "SCREAMING_SNAKE_CASE", example: "USER_PROFILE" },
+            { key: "kebab", label: "kebab-case", example: "user-profile" },
+            { key: "train", label: "Train-Case", example: "User-Profile" },
+            { key: "dot", label: "dot.case", example: "user.profile" },
+            { key: "path", label: "path/case", example: "user/profile" },
+            { key: "space", label: "space case", example: "user profile" },
+            { key: "title", label: "Title Case", example: "User Profile" },
+            { key: "flatLower", label: "lowercase", example: "userprofile" },
+            { key: "flatUpper", label: "UPPERCASE", example: "USERPROFILE" }
+        ];
+
+        // Чтобы добавить язык: подключите его mode-файл и добавьте одну строку сюда.
+        var LANGUAGES = [
+            { key: "javascript", label: "JavaScript", mode: "text/javascript" },
+            { key: "typescript", label: "TypeScript", mode: "text/typescript" },
+            { key: "json", label: "JSON", mode: { name: "javascript", json: true } },
+            { key: "html", label: "HTML", mode: "text/html" },
+            { key: "css", label: "CSS", mode: "text/css" },
+            { key: "php", label: "PHP", mode: "application/x-httpd-php" },
+            { key: "python", label: "Python", mode: "text/x-python" },
+            { key: "sql", label: "SQL", mode: "text/x-sql" },
+            { key: "shell", label: "Bash / Shell", mode: "text/x-sh" },
+            { key: "yaml", label: "YAML", mode: "text/x-yaml" },
+            { key: "markdown", label: "Markdown", mode: "text/x-markdown" },
+            { key: "plain", label: "Plain text", mode: "text/plain" }
+        ];
+
+        function createDefaultState() {
+            var enabledCases = {};
+            CASE_STYLES.forEach(function (style) { enabledCases[style.key] = true; });
+            return {
+                source: "",
+                result: "",
+                language: "javascript",
+                enabledCases: enabledCases,
+                rules: Array.from({ length: MIN_RULES }, function () { return { from: "", to: "" }; })
+            };
+        }
+
+        function loadState() {
+            var fallback = createDefaultState();
+            try {
+                var saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                if (!saved || typeof saved !== "object") return fallback;
+
+                var languageExists = LANGUAGES.some(function (language) { return language.key === saved.language; });
+                var rules = Array.isArray(saved.rules)
+                    ? saved.rules.map(function (rule) {
+                        return {
+                            from: typeof rule.from === "string" ? rule.from : "",
+                            to: typeof rule.to === "string" ? rule.to : ""
+                        };
+                    })
+                    : fallback.rules;
+
+                while (rules.length < MIN_RULES) rules.push({ from: "", to: "" });
+
+                CASE_STYLES.forEach(function (style) {
+                    if (saved.enabledCases && typeof saved.enabledCases[style.key] === "boolean") {
+                        fallback.enabledCases[style.key] = saved.enabledCases[style.key];
+                    }
+                });
+
+                return {
+                    source: typeof saved.source === "string" ? saved.source : "",
+                    result: typeof saved.result === "string" ? saved.result : "",
+                    language: languageExists ? saved.language : fallback.language,
+                    enabledCases: fallback.enabledCases,
+                    rules: rules
+                };
+            } catch (error) {
+                return fallback;
+            }
+        }
+
+        var state = loadState();
+        var elements = {
+            workspace: document.getElementById("workspace"),
+            languageSelect: document.getElementById("languageSelect"),
+            rulesList: document.getElementById("rulesList"),
+            rulesCount: document.getElementById("rulesCount"),
+            activeRuleCount: document.getElementById("activeRuleCount"),
+            replacementCount: document.getElementById("replacementCount"),
+            caseCount: document.getElementById("caseCount"),
+            caseOptions: document.getElementById("caseOptions"),
+            sourceStage: document.getElementById("sourceStage"),
+            resultStage: document.getElementById("resultStage"),
+            sourceCursor: document.getElementById("sourceCursor"),
+            resultCursor: document.getElementById("resultCursor"),
+            sourceSize: document.getElementById("sourceSize"),
+            resultSize: document.getElementById("resultSize"),
+            manualStatus: document.getElementById("manualStatus"),
+            saveStatus: document.getElementById("saveStatus"),
+            swapButton: document.getElementById("swapButton"),
+            confirmClearButton: document.getElementById("confirmClearButton"),
+            enableAllCases: document.getElementById("enableAllCases"),
+            disableAllCases: document.getElementById("disableAllCases"),
+            toastText: document.getElementById("toastText"),
+            appToast: document.getElementById("appToast")
+        };
+
+        function getLanguage(key) {
+            return LANGUAGES.find(function (language) { return language.key === key; }) || LANGUAGES[0];
+        }
+
+        function buildLanguageSelect() {
+            LANGUAGES.forEach(function (language) {
+                var option = document.createElement("option");
+                option.value = language.key;
+                option.textContent = language.label;
+                elements.languageSelect.appendChild(option);
+            });
+            elements.languageSelect.value = state.language;
+        }
+
+        buildLanguageSelect();
+
+        var editorOptions = {
+            mode: getLanguage(state.language).mode,
+            lineNumbers: true,
+            lineWrapping: false,
+            matchBrackets: true,
+            autoCloseBrackets: true,
+            styleActiveLine: true,
+            indentUnit: 4,
+            tabSize: 4,
+            indentWithTabs: false,
+            viewportMargin: 20,
+            extraKeys: {
+                Tab: function (cm) {
+                    if (cm.somethingSelected()) cm.indentSelection("add");
+                    else cm.replaceSelection(Array(cm.getOption("indentUnit") + 1).join(" "), "end", "+input");
+                }
+            }
+        };
+
+        var sourceEditor = CodeMirror.fromTextArea(document.getElementById("sourceEditor"), editorOptions);
+        var resultEditor = CodeMirror.fromTextArea(document.getElementById("resultEditor"), editorOptions);
+
+        suppressEditorChanges = true;
+        sourceEditor.setValue(state.source);
+        resultEditor.setValue(state.result);
+        suppressEditorChanges = false;
+
+        function isValidPascal(value) {
+            return PASCAL_PATTERN.test(value.trim());
+        }
+
+        function isCompleteRule(rule) {
+            return isValidPascal(rule.from) && isValidPascal(rule.to);
+        }
+
+        function getActiveRules() {
+            return state.rules
+                .map(function (rule, index) {
+                    return { from: rule.from.trim(), to: rule.to.trim(), index: index };
+                })
+                .filter(function (rule) { return isValidPascal(rule.from) && isValidPascal(rule.to); });
+        }
+
+        function validateRuleInput(input) {
+            var hasValue = input.value.trim().length > 0;
+            input.classList.toggle("is-invalid", hasValue && !isValidPascal(input.value));
+            input.setAttribute("aria-invalid", hasValue && !isValidPascal(input.value) ? "true" : "false");
+        }
+
+        function createRuleRow(rule, index) {
+            var row = document.createElement("div");
+            row.className = "rule-row";
+            row.dataset.ruleIndex = String(index);
+            row.style.animationDelay = Math.min(index * 25, 150) + "ms";
+
+            var number = document.createElement("span");
+            number.className = "rule-number";
+            number.textContent = String(index + 1).padStart(2, "0");
+
+            var fromInput = document.createElement("input");
+            fromInput.className = "rule-input from-field";
+            fromInput.type = "text";
+            fromInput.value = rule.from;
+            fromInput.placeholder = "BeforeName";
+            fromInput.autocomplete = "off";
+            fromInput.spellcheck = false;
+            fromInput.setAttribute("aria-label", "Было, правило " + (index + 1));
+            fromInput.setAttribute("data-rule-field", "from");
+
+            var arrow = document.createElement("span");
+            arrow.className = "rule-arrow";
+            arrow.textContent = "→";
+            arrow.setAttribute("aria-hidden", "true");
+
+            var toInput = document.createElement("input");
+            toInput.className = "rule-input to-field";
+            toInput.type = "text";
+            toInput.value = rule.to;
+            toInput.placeholder = "AfterName";
+            toInput.autocomplete = "off";
+            toInput.spellcheck = false;
+            toInput.setAttribute("aria-label", "Стало, правило " + (index + 1));
+            toInput.setAttribute("data-rule-field", "to");
+
+            [fromInput, toInput].forEach(function (input) {
+                input.addEventListener("input", function () {
+                    var field = input.getAttribute("data-rule-field");
+                    state.rules[index][field] = input.value;
+                    validateRuleInput(input);
+                    ensureTrailingRule();
+                    updateRuleCounters();
+                    scheduleTransform();
+                    scheduleSave();
+                });
+                validateRuleInput(input);
+            });
+
+            row.append(number, fromInput, arrow, toInput);
+            return row;
+        }
+
+        function renderRules() {
+            elements.rulesList.textContent = "";
+            state.rules.forEach(function (rule, index) {
+                elements.rulesList.appendChild(createRuleRow(rule, index));
+            });
+            updateRuleCounters();
+        }
+
+        function ensureTrailingRule() {
+            if (state.rules.length === 0 || state.rules.every(isCompleteRule)) {
+                var index = state.rules.length;
+                var newRule = { from: "", to: "" };
+                state.rules.push(newRule);
+                elements.rulesList.appendChild(createRuleRow(newRule, index));
+            }
+        }
+
+        function updateRuleCounters() {
+            var activeCount = getActiveRules().length;
+            elements.rulesCount.textContent = activeCount + " " + plural(activeCount, "правило", "правила", "правил");
+            elements.activeRuleCount.textContent = String(activeCount);
+        }
+
+        function splitPascal(value) {
+            return value.match(/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+|[A-Z]+/g) || [value];
+        }
+
+        function capitalize(value) {
+            return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+        }
+
+        function normalizedWords(raw) {
+            return splitPascal(raw).map(function (word) { return word.toLowerCase(); });
+        }
+
+        function formatCase(raw, styleKey) {
+            var words = normalizedWords(raw);
+            var titleWords = words.map(capitalize);
+
+            switch (styleKey) {
+                case "pascal": return raw;
+                case "pascalNormalized": return titleWords.join("");
+                case "camel": return words[0] + titleWords.slice(1).join("");
+                case "snake": return words.join("_");
+                case "screamingSnake": return words.join("_").toUpperCase();
+                case "kebab": return words.join("-");
+                case "train": return titleWords.join("-");
+                case "dot": return words.join(".");
+                case "path": return words.join("/");
+                case "space": return words.join(" ");
+                case "title": return titleWords.join(" ");
+                case "flatLower": return words.join("");
+                case "flatUpper": return words.join("").toUpperCase();
+                default: return raw;
+            }
+        }
+
+        function getVariants(raw) {
+            var variants = [];
+            CASE_STYLES.forEach(function (style) {
+                if (!state.enabledCases[style.key]) return;
+                variants.push({ text: formatCase(raw, style.key), style: style.key });
+                if (style.key === "pascal") {
+                    var normalized = formatCase(raw, "pascalNormalized");
+                    if (normalized !== raw) variants.push({ text: normalized, style: "pascalNormalized" });
+                }
+            });
+            return variants;
+        }
+
+        function escapeRegExp(value) {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }
+
+        function buildCandidates() {
+            var candidatesByText = new Map();
+
+            getActiveRules().forEach(function (rule) {
+                getVariants(rule.from).forEach(function (variant) {
+                    if (!variant.text || candidatesByText.has(variant.text)) return;
+                    candidatesByText.set(variant.text, {
+                        from: variant.text,
+                        to: formatCase(rule.to, variant.style),
+                        style: variant.style,
+                        ruleIndex: rule.index
+                    });
+                });
+            });
+
+            return Array.from(candidatesByText.values()).sort(function (a, b) {
+                return b.from.length - a.from.length || a.ruleIndex - b.ruleIndex;
+            });
+        }
+
+        function transformText(text) {
+            var candidates = buildCandidates();
+            if (!text || candidates.length === 0) return { output: text, matches: [] };
+
+            var candidateMap = new Map();
+            candidates.forEach(function (candidate) { candidateMap.set(candidate.from, candidate); });
+
+            var pattern = candidates.map(function (candidate) { return escapeRegExp(candidate.from); }).join("|");
+            var regex = new RegExp(pattern, "g");
+            var output = "";
+            var matches = [];
+            var cursor = 0;
+            var match;
+
+            while ((match = regex.exec(text)) !== null) {
+                var candidate = candidateMap.get(match[0]);
+                output += text.slice(cursor, match.index);
+                var resultStart = output.length;
+                output += candidate.to;
+                matches.push({
+                    sourceStart: match.index,
+                    sourceEnd: match.index + match[0].length,
+                    resultStart: resultStart,
+                    resultEnd: resultStart + candidate.to.length,
+                    ruleIndex: candidate.ruleIndex
+                });
+                cursor = match.index + match[0].length;
+            }
+
+            output += text.slice(cursor);
+            return { output: output, matches: matches };
+        }
+
+        function clearMarks() {
+            markHandles.forEach(function (mark) { mark.clear(); });
+            markHandles = [];
+        }
+
+        function markTransform(matches) {
+            clearMarks();
+            sourceEditor.operation(function () {
+                resultEditor.operation(function () {
+                    matches.forEach(function (match) {
+                        markHandles.push(sourceEditor.markText(
+                            sourceEditor.posFromIndex(match.sourceStart),
+                            sourceEditor.posFromIndex(match.sourceEnd),
+                            { className: "cm-replace-source", title: "Будет заменено · правило " + (match.ruleIndex + 1) }
+                        ));
+                        markHandles.push(resultEditor.markText(
+                            resultEditor.posFromIndex(match.resultStart),
+                            resultEditor.posFromIndex(match.resultEnd),
+                            { className: "cm-replace-target", title: "Результат · правило " + (match.ruleIndex + 1) }
+                        ));
+                    });
+                });
+            });
+        }
+
+        function applyTransform(options) {
+            options = options || {};
+            var transformed = transformText(sourceEditor.getValue());
+            lastGeneratedOutput = transformed.output;
+
+            if (options.preserveSaved && state.result !== transformed.output) {
+                clearMarks();
+                elements.manualStatus.textContent = "Результат содержит ручные правки";
+                elements.replacementCount.textContent = "—";
+                updateEditorMeta();
+                return;
+            }
+
+            suppressEditorChanges = true;
+            resultEditor.setValue(transformed.output);
+            suppressEditorChanges = false;
+            state.result = transformed.output;
+            elements.manualStatus.textContent = "";
+            elements.replacementCount.textContent = String(transformed.matches.length);
+            markTransform(transformed.matches);
+            updateEditorMeta();
+
+            elements.resultStage.classList.remove("reacting");
+            void elements.resultStage.offsetWidth;
+            if (transformed.matches.length) elements.resultStage.classList.add("reacting");
+        }
+
+        function scheduleTransform() {
+            window.clearTimeout(transformTimer);
+            transformTimer = window.setTimeout(function () { applyTransform(); }, 85);
+        }
+
+        function saveState() {
+            try {
+                state.source = sourceEditor.getValue();
+                state.result = resultEditor.getValue();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                elements.saveStatus.classList.remove("flash");
+                void elements.saveStatus.offsetWidth;
+                elements.saveStatus.classList.add("flash");
+                window.setTimeout(function () { elements.saveStatus.classList.remove("flash"); }, 500);
+            } catch (error) {
+                elements.saveStatus.textContent = "Не удалось сохранить";
+            }
+        }
+
+        function scheduleSave() {
+            window.clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(saveState, 180);
+        }
+
+        function updateEditorMeta() {
+            var sourceValue = sourceEditor.getValue();
+            var resultValue = resultEditor.getValue();
+            elements.sourceSize.textContent = formatNumber(sourceValue.length) + " символов";
+            elements.resultSize.textContent = formatNumber(resultValue.length) + " символов";
+            elements.sourceStage.classList.toggle("has-content", sourceValue.length > 0);
+            elements.resultStage.classList.toggle("has-content", resultValue.length > 0);
+        }
+
+        function updateCursor(editor, target) {
+            var cursor = editor.getCursor();
+            target.textContent = "Ln " + (cursor.line + 1) + ", Col " + (cursor.ch + 1);
+        }
+
+        function formatNumber(value) {
+            return new Intl.NumberFormat("ru-RU").format(value);
+        }
+
+        function plural(number, one, few, many) {
+            var mod10 = number % 10;
+            var mod100 = number % 100;
+            if (mod10 === 1 && mod100 !== 11) return one;
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+            return many;
+        }
+
+        function buildCaseOptions() {
+            elements.caseOptions.textContent = "";
+            CASE_STYLES.forEach(function (style) {
+                var label = document.createElement("label");
+                label.className = "case-option form-check m-0";
+
+                var input = document.createElement("input");
+                input.className = "form-check-input mt-0 me-2";
+                input.type = "checkbox";
+                input.checked = state.enabledCases[style.key];
+                input.dataset.caseKey = style.key;
+
+                var text = document.createElement("span");
+                text.className = "case-label";
+                text.textContent = style.example;
+
+                input.addEventListener("change", function () {
+                    state.enabledCases[style.key] = input.checked;
+                    updateCaseCounter();
+                    scheduleTransform();
+                    scheduleSave();
+                });
+
+                label.append(input, text);
+                elements.caseOptions.appendChild(label);
+            });
+            updateCaseCounter();
+        }
+
+        function setAllCases(enabled) {
+            CASE_STYLES.forEach(function (style) { state.enabledCases[style.key] = enabled; });
+            elements.caseOptions.querySelectorAll("input[type=checkbox]").forEach(function (input) {
+                input.checked = enabled;
+            });
+            updateCaseCounter();
+            applyTransform();
+            scheduleSave();
+        }
+
+        function updateCaseCounter() {
+            var count = CASE_STYLES.filter(function (style) { return state.enabledCases[style.key]; }).length;
+            elements.caseCount.textContent = count + " " + plural(count, "формат", "формата", "форматов");
+        }
+
+        function applyLanguage() {
+            var mode = getLanguage(state.language).mode;
+            sourceEditor.setOption("mode", mode);
+            resultEditor.setOption("mode", mode);
+        }
+
+        function performSwap() {
+            if (isSwapping) return;
+            isSwapping = true;
+            elements.swapButton.disabled = true;
+            elements.workspace.classList.add("is-swapping");
+
+            window.setTimeout(function () {
+                var oldSource = sourceEditor.getValue();
+                var oldResult = resultEditor.getValue();
+                state.rules = state.rules.map(function (rule) {
+                    return { from: rule.to, to: rule.from };
+                });
+
+                suppressEditorChanges = true;
+                sourceEditor.setValue(oldResult);
+                resultEditor.setValue(oldSource);
+                suppressEditorChanges = false;
+                state.source = oldResult;
+                state.result = oldSource;
+
+                renderRules();
+                ensureTrailingRule();
+                applyTransform();
+                saveState();
+            }, 155);
+
+            window.setTimeout(function () {
+                elements.workspace.classList.remove("is-swapping");
+                elements.swapButton.disabled = false;
+                isSwapping = false;
+                sourceEditor.refresh();
+                resultEditor.refresh();
+            }, 420);
+        }
+
+        function clearEverything() {
+            window.clearTimeout(saveTimer);
+            window.clearTimeout(transformTimer);
+            state = createDefaultState();
+            localStorage.removeItem(STORAGE_KEY);
+
+            suppressEditorChanges = true;
+            sourceEditor.setValue("");
+            resultEditor.setValue("");
+            suppressEditorChanges = false;
+
+            elements.languageSelect.value = state.language;
+            applyLanguage();
+            renderRules();
+            buildCaseOptions();
+            clearMarks();
+            lastGeneratedOutput = "";
+            elements.replacementCount.textContent = "0";
+            elements.manualStatus.textContent = "";
+            elements.saveStatus.textContent = "Локальное сохранение очищено";
+            updateEditorMeta();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById("clearModal")).hide();
+            showToast("Всё очищено");
+            sourceEditor.focus();
+        }
+
+        function fallbackCopy(text) {
+            var textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            textarea.remove();
+        }
+
+        function copyText(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text)
+                    .then(function () { showToast("Скопировано в буфер обмена"); })
+                    .catch(function () {
+                        fallbackCopy(text);
+                        showToast("Скопировано в буфер обмена");
+                    });
+            } else {
+                fallbackCopy(text);
+                showToast("Скопировано в буфер обмена");
+            }
+        }
+
+        function showToast(message) {
+            elements.toastText.textContent = message;
+            bootstrap.Toast.getOrCreateInstance(elements.appToast, { delay: 1800 }).show();
+        }
+
+        sourceEditor.on("change", function () {
+            if (suppressEditorChanges) return;
+            state.source = sourceEditor.getValue();
+            updateEditorMeta();
+            scheduleTransform();
+            scheduleSave();
+        });
+
+        resultEditor.on("change", function () {
+            if (suppressEditorChanges) return;
+            state.result = resultEditor.getValue();
+            var isManual = state.result !== lastGeneratedOutput;
+            elements.manualStatus.textContent = isManual ? "Результат изменён вручную" : "";
+            updateEditorMeta();
+            scheduleSave();
+        });
+
+        sourceEditor.on("cursorActivity", function () { updateCursor(sourceEditor, elements.sourceCursor); });
+        resultEditor.on("cursorActivity", function () { updateCursor(resultEditor, elements.resultCursor); });
+
+        elements.languageSelect.addEventListener("change", function () {
+            state.language = elements.languageSelect.value;
+            applyLanguage();
+            scheduleSave();
+        });
+
+        elements.swapButton.addEventListener("click", performSwap);
+        elements.confirmClearButton.addEventListener("click", clearEverything);
+        elements.enableAllCases.addEventListener("click", function () { setAllCases(true); });
+        elements.disableAllCases.addEventListener("click", function () { setAllCases(false); });
+
+        document.querySelectorAll("[data-copy-editor]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                copyText(button.dataset.copyEditor === "source" ? sourceEditor.getValue() : resultEditor.getValue());
+            });
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+                event.preventDefault();
+                saveState();
+                showToast("Состояние сохранено локально");
+            }
+        });
+
+        document.querySelectorAll("[data-bs-toggle=tooltip]").forEach(function (element) {
+            new bootstrap.Tooltip(element, { container: "body", trigger: "hover" });
+        });
+
+        renderRules();
+        ensureTrailingRule();
+        buildCaseOptions();
+        applyLanguage();
+        updateEditorMeta();
+        updateCursor(sourceEditor, elements.sourceCursor);
+        updateCursor(resultEditor, elements.resultCursor);
+        applyTransform({ preserveSaved: true });
+
+        window.addEventListener("resize", function () {
+            sourceEditor.refresh();
+            resultEditor.refresh();
+        });
+    })();
+</script>
 </body>
 </html>

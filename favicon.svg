@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <filter id="red-glow" x="-120%" y="-70%" width="340%" height="240%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="green-glow" x="-120%" y="-70%" width="340%" height="240%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="frame" x1="10" y1="7" x2="54" y2="57" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f2f4f4"/>
+      <stop offset="1" stop-color="#737878"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="15" fill="#090a0a"/>
+  <rect x="5.5" y="5.5" width="53" height="53" rx="12" fill="#111313" stroke="url(#frame)" stroke-width="3"/>
+  <rect x="17" y="19" width="10" height="26" rx="5" fill="#ff4050" filter="url(#red-glow)"/>
+  <rect x="37" y="19" width="10" height="26" rx="5" fill="#43ee8b" filter="url(#green-glow)"/>
+</svg>
