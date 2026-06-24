@@ -1,0 +1,10 @@
+{
+  "name": "airep",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Офлайн-инструмент для смысловой замены имён в коде с сохранением регистра.",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "deploy": "bash scripts/deploy.sh"
+  }
+}
